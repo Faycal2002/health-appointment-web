@@ -20,14 +20,19 @@
 
       <div class="container-fluid">
 
-    <a class="navbar-brand" href="#">
-      <img src="static/img/Logo.png" alt="Logo" width="35" height="35" class="d-inline-block align-text-top">
-      SmartHealth
-    </a>
-
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
+        <a class="navbar-brand" href="#">
+        <img src="static/img/Logo.png" alt="Logo" width="35" height="35" class="d-inline-block align-text-top">
+         SmartHealth
+        </a>
+        <div class="d-flex align-items-center gap-2 ms-auto d-lg-none">
+          <a class="btn btn-dark btn-sm" href="#">Login / Register</a>
+          <button class="navbar-toggler" type="button"
+              data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown"
+              aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+             <span class="navbar-toggler-icon"></span>
+             </button>
+        </div>
+        
         <div class="collapse navbar-collapse justify-content-lg-center" id="navbarNavDropdown">
           <ul class="navbar-nav gap-lg-4">
             <li class="nav-item">
@@ -60,11 +65,13 @@
             </li>
           </ul>
         </div>
+         <!-- Bouton desktop (à droite, hors menu) -->
+  <div class="d-none d-lg-block ms-lg-3">
+    <a class="btn btn-dark" href="#">Login / Register</a>
+  </div>
       </div>
     </nav>
-
-
-
+ 
 
 
 
