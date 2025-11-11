@@ -6,6 +6,16 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///smarthealth.db'  # database setup
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)  # database link
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    firstname = db.Column(db.String(100), nullable=False)
+    lastname = db.Column(db.String(100), nullable=False)
+    address = db.Column(db.String(100), nullable=False)
+    number = db.Column(db.Integer, nullable=False)
+    email = db.Column(db.String(100), nullable=False, unique=True)
+    password = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(50), nullable=False)
+
 
 
 
@@ -27,10 +37,12 @@ class Appointment(db.Model):
     patient_name = db.Column(db.String(100), nullable=False)
     age = db.Column(db.Integer, nullable=False)
     gender = db.Column(db.String(10), nullable=False)
-    ethnicity = db.Column(db.String(50), nullable=False)
     symptoms = db.Column(db.String(300), nullable=False)
     date = db.Column(db.String(20), nullable=False)
-    doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'))  # link to doctor table
+    hour = db.Column(db.Integer, nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('doctor.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
 
 @app.route("/")
 def home():
@@ -70,20 +82,19 @@ def search():
 @app.route("/book/<int:doctor_id>", methods=["GET", "POST"])
 def book_appointment(doctor_id):
     doctor = Doctor.query.get_or_404(doctor_id)
-    message = None  # error message if missing
-    success = None  # message if done
+    message = None
+    success = None
 
     if request.method == "POST":
-        # getting data from form
         name = request.form.get("name")
         age = request.form.get("age")
         gender = request.form.get("gender")
-        ethnicity = request.form.get("ethnicity")
         symptoms = request.form.get("symptoms")
         date = request.form.get("date")
+        hour = request.form.get("hour")
 
         # check if fields are empty
-        if not name or not age or not gender or not ethnicity or not symptoms or not date:
+        if not name or not age or not gender or not symptoms or not date or not hour:
             message = "Please fill in all fields properly."
         else:
             # create new appointment record
@@ -91,17 +102,15 @@ def book_appointment(doctor_id):
                 patient_name=name,
                 age=age,
                 gender=gender,
-                ethnicity=ethnicity,
                 symptoms=symptoms,
                 date=date,
+                hour=hour,
                 doctor_id=doctor.id
             )
             db.session.add(new_appt)
             db.session.commit()
-            # redirect to confirmation page after successful booking
             return redirect(url_for("appointment_confirmed", doctor_id=doctor.id))
 
-    # if GET, show booking form
     return render_template("book_appointment.html", doctor=doctor, message=message, success=success)
 
 

@@ -24,14 +24,13 @@
   <div class="card shadow-sm border-0 rounded-4 p-4 mx-auto" style="max-width: 700px;">
     <div class="text-center mb-3">
       <!-- this part shows the doctor profile pic -->
-      <img src="{{ url_for('static', filename=doctor.image) }}" 
-           alt="{{ doctor.name }}" class="rounded-circle shadow" 
-           style="width: 120px; height: 120px; object-fit: cover;">
+      <img src="{{ url_for('static', filename=doctor.image) }}" alt="{{ doctor.name }}" class="rounded-circle shadow"
+        style="width: 120px; height: 120px; object-fit: cover;">
       <h4 class="mt-3">{{ doctor.name }}</h4>
       <p class="text-muted">{{ doctor.specialty }} — {{ doctor.location }}</p>
     </div>
 
-    
+
     <!-- had issues with missing doctor_id earlier but fixed by passing it in flask route -->
     <form method="POST" action="{{ url_for('book_appointment', doctor_id=doctor.id) }}">
 
@@ -61,19 +60,25 @@
 
       <!-- more info below -->
       <div class="row g-3 mt-3">
-        <div class="col-md-6">
-          <!-- wasn’t sure if ethnicity was required but added anyway -->
-          <label class="form-label fw-semibold">Ethnicity</label>
-          <input type="text" name="ethnicity" class="form-control" placeholder="e.g. Asian, White, Black">
-        </div>
-
-        <!-- date input for appointment -->
-        <!-- need to check if we can disable past dates here maybe with JS -->
-        <div class="col-md-6">
+        <div class="col-12 col-md-6">
           <label class="form-label fw-semibold">Appointment Date</label>
           <input type="date" name="date" class="form-control">
         </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Appointment Time</label>
+          <select name="time" class="form-select">
+            <option value="">Select</option>
+            <option value="09:00">09:00 AM</option>
+            <option value="10:00">10:00 AM</option>
+            <option value="11:00">11:00 AM</option>
+            <option value="14:00">02:00 PM</option>
+            <option value="15:00">03:00 PM</option>
+            <option value="16:00">04:00 PM</option>
+          </select>
+        </div>
       </div>
+
+
 
       <!-- main text area where user explains their issue -->
       <div class="mt-3">

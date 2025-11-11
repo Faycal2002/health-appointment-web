@@ -1,5 +1,11 @@
+html {
+  scroll-behavior: smooth;
+}
+
+
+
 .carousel {
-  max-width: 800px; /* ajuste selon ton design */
+  max-width: 600px; /* ajuste selon ton design */
   margin: 0 auto; /* centre le carousel */
 }
 
