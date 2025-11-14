@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Search Doctors - SmartHealth{% endblock %}
+{% block content %}
+
+<section class="container mt-5 mb-5">
+  <div class="text-center mb-4">
+    <h2 class="fw-bold">Find the Right Doctor</h2>
+    <p class="text-muted">Search by name, specialty, or city — and explore their profiles below.</p>
+  </div>
+
+  <form method="GET" action="{{ url_for('search') }}" class="mb-5">
+    <div class="input-group input-group-lg shadow-sm rounded-pill">
+      <span class="input-group-text bg-dark text-white fw-semibold rounded-start-pill"></span>
+      <input 
+        type="text" 
+        name="query" 
+        class="form-control border-0"
+        placeholder="Enter doctor name, specialty, or city..."
+        value="{{ request.args.get('query', '') }}"
+      >
+      <button type="submit" class="btn btn-dark rounded-end-pill px-4">Search</button>
+    </div>
+  </form>
+
+  <div class="row g-4">
+    {% for doctor in doctors %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card h-100 shadow-sm border-0 rounded-4">
+        <img src="{{ url_for('static', filename=doctor.image) }}" class="card-img-top" alt="{{ doctor.name }}">
+        <div class="card-body">
+          <h5 class="fw-bold mb-1">{{ doctor.name }}</h5>
+          <p class="text-muted small mb-2">{{ doctor.specialty }} — {{ doctor.location }}</p>
+          <p class="small">{{ doctor.description }}</p>
+        </div>
+
+        
+       <div class="card-footer bg-transparent border-0 text-center">
+  <a href="{{ url_for('book_appointment', doctor_id=doctor.id) }}" 
+     class="btn btn-outline-dark btn-sm rounded-pill me-2">See Profile</a>
+  <a href="{{ url_for('book_appointment', doctor_id=doctor.id) }}" 
+     class="btn btn-dark btn-sm rounded-pill">Book Appointment</a>
+</div>
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-5">
+    <h5 class="fw-semibold mb-3">Map of Results</h5>
+    <div class="ratio ratio-16x9 shadow-sm rounded-4">
+      {% if query %}
+        <iframe 
+          src="https://www.google.com/maps?q={{ query | urlencode }}&output=embed"
+          style="border:0; border-radius:10px;" allowfullscreen loading="lazy">
+        </iframe>
+      {% else %}
+        <iframe 
+          src="https://www.google.com/maps?q=United+Kingdom&output=embed"
+          style="border:0; border-radius:10px;" allowfullscreen loading="lazy">
+        </iframe>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% endblock %}
