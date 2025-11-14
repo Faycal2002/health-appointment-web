@@ -15,10 +15,13 @@
         <nav class="navbar navbar-expand-lg fixed-top bg-white">
           <div class="container-fluid">
 
-            <a class="navbar-brand" href="/">
-              <img src="static/img/Logo.png" alt="Logo" width="35" height="35" class="d-inline-block align-text-top">
-              SmartHealth
-            </a>
+        <a class="navbar-brand" href="/">
+          <img src="{{ url_for('static', filename='img/Logo.png') }}" 
+              alt="Logo" width="35" height="35" 
+              class="d-inline-block align-text-top">
+          SmartHealth
+        </a>
+
 
             <div class="d-flex align-items-center gap-2 ms-auto d-lg-none">
               <a class="btn btn-dark btn-sm" href="/login">Login / Register</a>
