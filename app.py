@@ -1,27 +1,38 @@
-from flask import Flask, render_template, request, redirect, url_for,session
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_sqlalchemy import SQLAlchemy
-from datetime import date   
-from flask import Flask, render_template, request, redirect, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import date
+import os
+from werkzeug.utils import secure_filename
+from functools import wraps
 
-# setting up the flask app
+# -------------------------
+# FLASK APP CONFIG
+# -------------------------
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///smarthealth.db'  # database setup
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///smarthealth.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'faycel_habchi123456789'  # pour les sessions
+app.config['SECRET_KEY'] = 'faycel_habchi123456789'
 
-db = SQLAlchemy(app)  # database link
+# dossier pour les images uploadées
+app.config['UPLOAD_FOLDER'] = os.path.join('static', 'uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+db = SQLAlchemy(app)
+
+
+# -------------------------
+# DATABASE MODELS
+# -------------------------
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
     address = db.Column(db.String(100), nullable=False)
     number = db.Column(db.Integer, nullable=False)
-    email = db.Column(db.String(100), nullable=False, unique=True)
+    email = db.Column(db.String(100), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), nullable=False)
-
-
+    role = db.Column(db.String(50), nullable=False)  # "admin" ou "patient"
 
 
 class Doctor(db.Model):
@@ -29,14 +40,11 @@ class Doctor(db.Model):
     name = db.Column(db.String(100), nullable=False)
     specialty = db.Column(db.String(50), nullable=False)
     location = db.Column(db.String(50), nullable=False)
-    image = db.Column(db.String(100))  # path for image file in static
-    description = db.Column(db.String(300))  # small text about doctor
-
-    # link to appointments (so admin can see which patients booked)
+    image = db.Column(db.String(100))   # ex : "uploads/monimage.jpg"
+    description = db.Column(db.String(300))
     appointments = db.relationship('Appointment', backref='doctor', lazy=True)
 
 
-# appointment table (patients fill this in form)
 class Appointment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_name = db.Column(db.String(100), nullable=False)
@@ -49,6 +57,56 @@ class Appointment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 
+# -------------------------
+# CONTEXT PROCESSORS (NAVBAR)
+# -------------------------
+@app.context_processor
+def inject_specialties():
+    specialties = db.session.query(Doctor.specialty).distinct().all()
+    specialties = [s[0] for s in specialties]
+    return {"nav_specialties": specialties}
+
+
+@app.context_processor
+def inject_user():
+    user_id = session.get("user_id")
+    role = session.get("user_role")
+
+    user = None
+    if user_id:
+        user = User.query.get(user_id)
+
+    return dict(current_user=user, current_role=role)
+
+
+# -------------------------
+# DECORATEUR login_required
+# -------------------------
+def login_required(role=None):
+    """
+    Si role=None  -> juste connecté
+    Si role='admin' -> connecté ET admin uniquement
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(*args, **kwargs):
+            user_id = session.get("user_id")
+            user_role = (session.get("user_role") or "").strip().lower()
+
+            if not user_id:
+                return redirect(url_for("login", next=request.path))
+
+            if role is not None and user_role != role.strip().lower():
+                return redirect(url_for("home"))
+
+            return view_func(*args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
+# -------------------------
+# ROUTES PUBLIQUES
+# -------------------------
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -57,115 +115,293 @@ def home():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        action = request.form.get("action")  # "login" ou "register"
         error = None
 
-        # Si l'utilisateur veut se CONNECTER
-        if action == "login":
-            email = request.form.get("login_email")
-            password = request.form.get("login_password")
+        # ----- LOGIN -----
+        if "login_email" in request.form:
+            email = (request.form.get("login_email") or "").strip()
+            password = request.form.get("login_password") or ""
+
+            if not email or not password:
+                error = "Please enter both email and password."
+                flash(error, "danger")
+                return render_template("login.html")
 
             user = User.query.filter_by(email=email).first()
 
-            if user is None:
+            if not user:
                 error = "No account found with this email."
             elif not check_password_hash(user.password, password):
                 error = "Incorrect password."
 
-            if error is None:
-                # on sauvegarde l'utilisateur dans la session
+            if error:
+                flash(error, "danger")
+            else:
+                role = (user.role or "patient").strip().lower()
+                user.role = role  # normalise dans la DB aussi
+                db.session.commit()
+
                 session["user_id"] = user.id
-                session["user_role"] = user.role
-                session["user_email"] = user.email
-                
+                session["user_role"] = role
 
-                flash("Login successful! Welcome back!", "success")
+                flash("Login successful!", "success")
 
-                # Si admin → redirige vers /admin, sinon vers /search
-                if user.role == "admin":
+                if role == "admin":
                     return redirect(url_for("admin"))
                 else:
                     next_page = request.args.get("next")
-                    if next_page:
-                        return redirect(next_page)
-                    return redirect(url_for("search"))
-            else:
-                flash(error, "danger")
+                    return redirect(next_page or url_for("search"))
 
-        # Si l'utilisateur veut s'INSCRIRE
-        elif action == "register":
+        # ----- REGISTER -----
+        elif "firstname" in request.form:
             firstname = request.form.get("firstname")
             lastname = request.form.get("lastname")
             email = request.form.get("email")
             password = request.form.get("password")
             address = request.form.get("address")
             number = request.form.get("number")
-            role = "patient"  # par défaut
 
-            # Vérifier que tout est rempli
-            if not all([firstname, lastname, email, password, address, number]):
-                error = "Please fill in all fields."
+            if User.query.filter_by(email=email).first():
+                flash("Email already exists.", "danger")
+                return render_template("login.html")
 
-            # Vérifier si email déjà utilisé
-            existing_user = User.query.filter_by(email=email).first()
-            if existing_user:
-                error = "Email already exists! Please use another one."
+            hashed_pw = generate_password_hash(password)
+            new_user = User(
+                firstname=firstname,
+                lastname=lastname,
+                email=email,
+                password=hashed_pw,
+                address=address,
+                number=int(number),
+                role="patient"
+            )
+            db.session.add(new_user)
+            db.session.commit()
 
-            if error is None:
-                hashed_pw = generate_password_hash(password)
+            session["user_id"] = new_user.id
+            session["user_role"] = "patient"
 
-                new_user = User(
-                    firstname=firstname,
-                    lastname=lastname,
-                    email=email,
-                    password=hashed_pw,
-                    address=address,
-                    number=int(number),
-                    role=role
-                )
-                db.session.add(new_user)
-                db.session.commit()
+            flash("Registration successful!", "success")
+            return redirect(url_for("search"))
 
-                # connexion direct après inscription
-                session["user_id"] = new_user.id
-                session["user_role"] = new_user.role
-                session["user_email"] = new_user.email
-                session["user_avatar"] = "img/default-avatar.png"
-
-                flash("Registration successful! You are now logged in.", "success")
-
-                next_page = request.args.get("next")
-                if next_page:
-                    return redirect(next_page)
-                return redirect(url_for("search"))
-            else:
-                flash(error, "danger")
-
-    # GET → on affiche juste le template login/register
     return render_template("login.html")
 
 
-@app.route("/doctor_login")
-def doctor_login():
-    # no password for now just direct route to admin
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "info")
+    return redirect(url_for("home"))
+
+
+# -------------------------
+# ADMIN DASHBOARD
+# -------------------------
+@app.route("/admin")
+@login_required(role="admin")
+def admin():
+    doctors = Doctor.query.all()
+    users = User.query.all()
+    appointments = Appointment.query.all()
+    return render_template("admin.html", doctors=doctors, users=users, appointments=appointments)
+
+
+# ---------- DOCTORS ----------
+@app.route("/admin/add_doctor", methods=["POST"])
+@login_required(role="admin")
+def add_doctor():
+    name = request.form.get("name")
+    specialty = request.form.get("specialty")
+    location = request.form.get("location")
+    description = request.form.get("description")
+
+    image_file = request.files.get("image")
+    if image_file and image_file.filename != "":
+        filename = secure_filename(image_file.filename)
+        image_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        image_file.save(image_path)
+        image_field = f"uploads/{filename}"
+    else:
+        image_field = "img/doctor1.jpg"
+
+    new_doctor = Doctor(
+        name=name,
+        specialty=specialty,
+        location=location,
+        description=description,
+        image=image_field
+    )
+
+    db.session.add(new_doctor)
+    db.session.commit()
+    flash("Doctor added successfully.", "success")
     return redirect(url_for("admin"))
 
-@app.route("/admin")
-def admin():
-    doctors = Doctor.query.all()  
-    appointments = Appointment.query.all()  
-    return render_template("admin.html", doctors=doctors, appointments=appointments)
+
+@app.route("/admin/delete_doctor/<int:doctor_id>", methods=["POST"])
+@login_required(role="admin")
+def delete_doctor(doctor_id):
+    doctor = Doctor.query.get_or_404(doctor_id)
+    db.session.delete(doctor)
+    db.session.commit()
+    flash("Doctor deleted.", "info")
+    return redirect(url_for("admin"))
 
 
+@app.route("/admin/update_doctor/<int:doctor_id>", methods=["POST"])
+@login_required(role="admin")
+def update_doctor(doctor_id):
+    doctor = Doctor.query.get_or_404(doctor_id)
+
+    doctor.name = request.form.get("name")
+    doctor.specialty = request.form.get("specialty")
+    doctor.location = request.form.get("location")
+    doctor.description = request.form.get("description")
+
+    image_file = request.files.get("image")
+    if image_file and image_file.filename != "":
+        filename = secure_filename(image_file.filename)
+        image_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        image_file.save(image_path)
+        doctor.image = f"uploads/{filename}"
+
+    db.session.commit()
+    flash("Doctor updated successfully!", "success")
+    return redirect(url_for("admin"))
+
+
+# ---------- USERS ----------
+@app.route("/admin/add_user", methods=["POST"])
+@login_required(role="admin")
+def add_user():
+    firstname = request.form.get("firstname")
+    lastname = request.form.get("lastname")
+    address = request.form.get("address")
+    number = request.form.get("number")
+    email = request.form.get("email")
+    password = request.form.get("password")
+    role_raw = request.form.get("role", "patient")
+
+    role = (role_raw or "patient").strip().lower()
+
+    if not all([firstname, lastname, address, number, email, password]):
+        flash("Please fill all user fields.", "danger")
+        return redirect(url_for("admin"))
+
+    if User.query.filter_by(email=email).first():
+        flash("Email already exists.", "danger")
+        return redirect(url_for("admin"))
+
+    hashed_pw = generate_password_hash(password)
+
+    new_user = User(
+        firstname=firstname,
+        lastname=lastname,
+        address=address,
+        number=int(number),
+        email=email,
+        password=hashed_pw,
+        role=role
+    )
+    db.session.add(new_user)
+    db.session.commit()
+    flash("User added successfully.", "success")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/delete_user/<int:user_id>", methods=["POST"])
+@login_required(role="admin")
+def delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+    db.session.delete(user)
+    db.session.commit()
+    flash("User deleted.", "info")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/update_user/<int:user_id>", methods=["POST"])
+@login_required(role="admin")
+def update_user(user_id):
+    user = User.query.get_or_404(user_id)
+
+    user.firstname = request.form.get("firstname")
+    user.lastname = request.form.get("lastname")
+    user.address = request.form.get("address")
+    user.number = request.form.get("number")
+    user.email = request.form.get("email")
+
+    role_raw = request.form.get("role")
+    user.role = (role_raw or user.role).strip().lower()
+
+    db.session.commit()
+    flash("User updated successfully!", "success")
+    return redirect(url_for("admin"))
+
+
+# ---------- APPOINTMENTS (ADMIN) ----------
+@app.route("/admin/add_appointment", methods=["POST"])
+@login_required(role="admin")
+def add_appointment():
+    patient_name = request.form.get("patient_name")
+    doctor_id = request.form.get("doctor_id")
+    date_str = request.form.get("date")
+    hour = request.form.get("hour")
+    symptoms = request.form.get("symptoms")
+
+    if not all([patient_name, doctor_id, date_str, hour, symptoms]):
+        flash("Please fill all appointment fields.", "danger")
+        return redirect(url_for("admin"))
+
+    new_appt = Appointment(
+        patient_name=patient_name,
+        age=0,
+        gender="N/A",
+        symptoms=symptoms,
+        date=date_str,
+        hour=hour,
+        doctor_id=int(doctor_id),
+        user_id=None
+    )
+    db.session.add(new_appt)
+    db.session.commit()
+    flash("Appointment added successfully.", "success")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/delete_appointment/<int:appt_id>", methods=["POST"])
+@login_required(role="admin")
+def delete_appointment(appt_id):
+    appt = Appointment.query.get_or_404(appt_id)
+    db.session.delete(appt)
+    db.session.commit()
+    flash("Appointment deleted.", "info")
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/update_appointment/<int:appt_id>", methods=["POST"])
+@login_required(role="admin")
+def update_appointment(appt_id):
+    appt = Appointment.query.get_or_404(appt_id)
+
+    appt.patient_name = request.form.get("patient_name")
+    appt.date = request.form.get("date")
+    appt.hour = request.form.get("hour")
+    appt.symptoms = request.form.get("symptoms")
+    appt.doctor_id = request.form.get("doctor_id")
+
+    db.session.commit()
+    flash("Appointment updated successfully!", "success")
+    return redirect(url_for("admin"))
+
+
+# -------------------------
+# ROUTES PATIENT (protégées)
+# -------------------------
 @app.route("/search")
+@login_required()
 def search():
-    # 1️⃣ Si pas connecté → redirige vers login
-    if "user_id" not in session:
-        # on garde en mémoire où il voulait aller (ici /search)
-        return redirect(url_for("login", next=request.path))
-
-    # 2️⃣ Si connecté → comportement normal
     query = request.args.get("query", "")
+
     if query:
         doctors = Doctor.query.filter(
             (Doctor.name.like(f"%{query}%")) |
@@ -174,67 +410,60 @@ def search():
         ).all()
     else:
         doctors = Doctor.query.all()
+
     return render_template("search.html", doctors=doctors, query=query)
 
 
-# this is the booking route (for patient)
 @app.route("/book/<int:doctor_id>", methods=["GET", "POST"])
+@login_required()
 def book_appointment(doctor_id):
     doctor = Doctor.query.get_or_404(doctor_id)
     message = None
-    success = None
 
     if request.method == "POST":
         name = request.form.get("name")
         age = request.form.get("age")
         gender = request.form.get("gender")
         symptoms = request.form.get("symptoms")
-        appointment_date = request.form.get("date")   # ⬅️ correspond à name="date"
-        time_str = request.form.get("time")           # ⬅️ correspond à name="time"
+        appointment_date = request.form.get("date")
+        time_str = request.form.get("time")
 
-        # check if fields are empty
-        if not name or not age or not gender or not symptoms or not appointment_date or not time_str:
-            message = "Please fill in all fields properly."
+        if not all([name, age, gender, symptoms, appointment_date, time_str]):
+            message = "Please fill in all fields."
         else:
             new_appt = Appointment(
                 patient_name=name,
-                age=age,
+                age=int(age),
                 gender=gender,
                 symptoms=symptoms,
                 date=appointment_date,
-                hour=time_str,          # ⬅️ on utilise la valeur du select
-                doctor_id=doctor.id
+                hour=time_str,
+                doctor_id=doctor.id,
+                user_id=session.get("user_id")
             )
             db.session.add(new_appt)
             db.session.commit()
             return redirect(url_for("appointment_confirmed", doctor_id=doctor.id))
 
-    # ⬅️ ici, pas de conflit : on utilise dt_date (la classe), pas une variable
-    today = date.today().isoformat()  # 'YYYY-MM-DD'
-
-    return render_template(
-        "book_appointment.html",
-        doctor=doctor,
-        message=message,
-        success=success,
-        today=today      # ⬅️ envoyé au template pour min="{{ today }}"
-    )
+    today = date.today().isoformat()
+    return render_template("book_appointment.html", doctor=doctor, today=today, message=message)
 
 
-# confirmation page route
 @app.route("/appointment_confirmed/<int:doctor_id>")
+@login_required()
 def appointment_confirmed(doctor_id):
     doctor = Doctor.query.get_or_404(doctor_id)
-    # this just shows a page saying booked successfully
     return render_template("appointment_confirmed.html", doctor=doctor)
 
 
-
+# -------------------------
+# CREATE DB + ADMIN PAR DÉFAUT
+# -------------------------
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()  # makes db if not exists
+        db.create_all()
 
-        # only adds demo data once (so it doesn't repeat)
+        # Docteurs de démo si vide
         if not Doctor.query.first():
             doctors = [
                 Doctor(name="Dr. John Smith", specialty="Cardiology", location="Sheffield",
@@ -248,11 +477,24 @@ if __name__ == "__main__":
                 Doctor(name="Dr. Noah Khan", specialty="Pediatrics", location="Manchester",
                        image="img/doctor5.jpg", description="Pediatrician dedicated to child development and family care."),
                 Doctor(name="Dr. Sarah Benali", specialty="Psychiatry", location="London",
-                       image="img/doctor6.jpg", description="Compassionate psychiatrist supporting mental wellness.")
+                       image="img/doctor6.jpg", description="Compassionate psychiatrist supporting mental wellness."),
             ]
             db.session.add_all(doctors)
-            db.session.commit()  # save demo doctors
-            # just to make sure there’s data for the search page
+            db.session.commit()
 
-    # running on debug so can see errors
+        # 👇 ADMIN PAR DÉFAUT SI AUCUN ADMIN N'EXISTE
+        if not User.query.filter(User.role.ilike("admin")).first():
+            admin_user = User(
+                firstname="Admin",
+                lastname="User",
+                address="Admin Address",
+                number=123456789,
+                email="admin@smarthealth.com",
+                password=generate_password_hash("admin123"),
+                role="admin",
+            )
+            db.session.add(admin_user)
+            db.session.commit()
+            print(">>> Admin créé : admin@smarthealth.com / admin123")
+
     app.run(debug=True)
