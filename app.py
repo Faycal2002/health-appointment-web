@@ -462,39 +462,4 @@ def appointment_confirmed(doctor_id):
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-
-        # Docteurs de démo si vide
-        if not Doctor.query.first():
-            doctors = [
-                Doctor(name="Dr. John Smith", specialty="Cardiology", location="Sheffield",
-                       image="img/doctor1.jpg", description="Expert in cardiovascular health and patient care."),
-                Doctor(name="Dr. Emma Lee", specialty="Dermatology", location="Leeds",
-                       image="img/doctor2.jpg", description="Specialist in skincare, acne treatment, and laser therapy."),
-                Doctor(name="Dr. James Patel", specialty="Orthopedic Surgery", location="Birmingham",
-                       image="img/doctor3.jpg", description="Experienced orthopedic surgeon focusing on joint and spine health."),
-                Doctor(name="Dr. Olivia Wright", specialty="Neurology", location="Nottingham",
-                       image="img/doctor4.jpg", description="Neurology expert specializing in migraines and cognitive disorders."),
-                Doctor(name="Dr. Noah Khan", specialty="Pediatrics", location="Manchester",
-                       image="img/doctor5.jpg", description="Pediatrician dedicated to child development and family care."),
-                Doctor(name="Dr. Sarah Benali", specialty="Psychiatry", location="London",
-                       image="img/doctor6.jpg", description="Compassionate psychiatrist supporting mental wellness."),
-            ]
-            db.session.add_all(doctors)
-            db.session.commit()
-
-        # 👇 ADMIN PAR DÉFAUT SI AUCUN ADMIN N'EXISTE
-        if not User.query.filter(User.role.ilike("admin")).first():
-            admin_user = User(
-                firstname="Admin",
-                lastname="User",
-                address="Admin Address",
-                number=123456789,
-                email="admin@smarthealth.com",
-                password=generate_password_hash("admin123"),
-                role="admin",
-            )
-            db.session.add(admin_user)
-            db.session.commit()
-            print(">>> Admin créé : admin@smarthealth.com / admin123")
-
     app.run(debug=True)
