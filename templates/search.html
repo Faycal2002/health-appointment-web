@@ -33,10 +33,10 @@
           <p class="small">{{ doctor.description }}</p>
         </div>
 
-        
+
        <div class="card-footer bg-transparent border-0 text-center">
-  <a href="{{ url_for('book_appointment', doctor_id=doctor.id) }}" 
-     class="btn btn-outline-dark btn-sm rounded-pill me-2">See Profile</a>
+  <a href="{{ url_for('appointments', doctor_id=doctor.id) }}" 
+     class="btn btn-outline-dark btn-sm rounded-pill me-2">Track</a>
   <a href="{{ url_for('book_appointment', doctor_id=doctor.id) }}" 
      class="btn btn-dark btn-sm rounded-pill">Book Appointment</a>
 </div>

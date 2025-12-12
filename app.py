@@ -455,6 +455,20 @@ def appointment_confirmed(doctor_id):
     doctor = Doctor.query.get_or_404(doctor_id)
     return render_template("appointment_confirmed.html", doctor=doctor)
 
+@app.route("/appointments")
+@login_required()
+def appointments():
+    user_id = session.get("user_id")
+
+    my_appointments = (
+        Appointment.query
+        .filter_by(user_id=user_id)
+        .order_by(Appointment.date.desc(), Appointment.hour.desc())
+        .all()
+    )
+
+    return render_template("appointments.html", appointments=my_appointments)
+
 
 # -------------------------
 # CREATE DB + ADMIN PAR DÉFAUT
