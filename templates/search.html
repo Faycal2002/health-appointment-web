@@ -35,10 +35,10 @@
 
 
        <div class="card-footer bg-transparent border-0 text-center">
-  <a href="{{ url_for('appointments', doctor_id=doctor.id) }}" 
-     class="btn btn-outline-dark btn-sm rounded-pill me-2">Track</a>
   <a href="{{ url_for('book_appointment', doctor_id=doctor.id) }}" 
-     class="btn btn-dark btn-sm rounded-pill">Book Appointment</a>
+     class="btn btn-dark btn-sm rounded-pill me-2">Book</a>
+  <a href="{{ url_for('appointments', doctor_id=doctor.id) }}" 
+     class="btn btn-outline-dark btn-sm rounded-pill">Track my appointments</a>
 </div>
 
       </div>
