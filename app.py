@@ -134,9 +134,23 @@ def login():
             elif not check_password_hash(user.password, password):
                 error = "Incorrect password."
 
+            user = User.query.filter_by(email=email).first()
+
+            if not user:
+                error = "No account found with this email."
+            elif not check_password_hash(user.password, password):
+                error = "Incorrect password."
+
             if error:
                 flash(error, "danger")
+                # Ceci est l'action qui manquait : recharger la page
+                return render_template("login.html") 
             else:
+                
+            
+                role = (user.role or "patient").strip().lower()
+
+            
                 role = (user.role or "patient").strip().lower()
                 user.role = role  # normalise dans la DB aussi
                 db.session.commit()
